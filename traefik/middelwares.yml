@@ -1,0 +1,70 @@
+http:
+  middlewares:
+
+    # --- Base headers (strict) ---
+    secure-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        frameDeny: true
+        contentTypeNosniff: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "geolocation=(), microphone=(), camera=()"
+	customResponseHeaders:
+          # Strict CSP: Only allow resources from the same origin. 
+          # Adjust if you load external fonts or internal CDNs.
+          Content-Security-Policy: "default-src 'self'; frame-ancestors 'none'; object-src 'none';"
+
+    #  --- Compression ---
+    gzip:
+      compress: {}
+
+    # --- Rate limit (per-client) ---
+    app-ratelimit:
+      rateLimit:
+        average: 30
+        burst: 60
+        period: 1s
+        # If behind Cloudflare, uncomment to key by real client IP:
+        # sourceCriterion:
+        #   requestHeaderName: CF-Connecting-IP
+
+    # --- Small retry on hiccups
+    retry-2:
+      retry:
+        attempts: 2
+        initialInterval: 100ms
+
+    # --- SSN office/VPN allow list ---
+    ip-vpn--allow:
+      ipAllowList:
+        sourceRange:
+          - "192.168.100.0/24" # subnet
+          - 192.168.10.10      # single IP
+
+    # ==============================
+    # CHAINS (grouped middlewares)
+    # Traefik executes middlewares in the order they are listed in the chain.
+    # ==============================
+
+    # Global default for most sites/APIs
+    global-chain:
+      chain:
+        middlewares:
+	  - ip-vpn--allow   # 1. Block unauthorized access immediately. Check IP FIRST (don't waste resources on unauthorized IPs)
+          - app-ratelimit   # 2. Stop DDoS/Spam first. Prevent internal scripts/bugs from spamming the DB
+          - secure-headers  # 3. Apply HSTS and XSS protections
+          - gzip            # 4. Optional: Remove if BREACH is a major concern for you
+          - retry-2         # 5. Final safety net. Last resort for flaky backends
+
+  # Transport for self-signed upstreams
+  serversTransports:
+    selfsigned-tls:
+      insecureSkipVerify: true
+      forwardingTimeouts:
+        dialTimeout: 5s
+        responseHeaderTimeout: 60s
+        idleConnTimeout: 90s
+
