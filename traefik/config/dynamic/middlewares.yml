@@ -1,0 +1,20 @@
+################################################################
+# Dynamic configuration — security headers middleware
+# Place additional routers/services/middlewares in this directory.
+################################################################
+
+http:
+  middlewares:
+    secure-headers:
+      headers:
+        sslRedirect: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        contentTypeNosniff: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow"
+          server: ""

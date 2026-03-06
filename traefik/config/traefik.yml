@@ -1,0 +1,53 @@
+################################################################
+# Traefik static configuration
+################################################################
+
+# API & dashboard
+api:
+  dashboard: true
+  insecure: false
+
+# Entry points
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+
+# Certificate resolvers
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "${ACME_EMAIL}"
+      storage: /certs/acme.json
+      httpChallenge:
+        entryPoint: web
+
+# Docker provider
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: traefik-proxy
+  file:
+    directory: /dynamic
+    watch: true
+
+# Logging
+log:
+  level: INFO
+  filePath: ""
+
+# Access logs
+accessLog:
+  filePath: ""
+  bufferingSize: 100
