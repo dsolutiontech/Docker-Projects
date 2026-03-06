@@ -1,0 +1,26 @@
+# This file is managed by the setup script.
+# Passwords are hashed with bcrypt.
+# Do NOT commit this file with real credentials.
+
+_meta:
+  type: "internalusers"
+  config_version: 2
+
+admin:
+  hash: "REPLACE_WITH_BCRYPT_HASH"
+  reserved: true
+  backend_roles:
+    - "admin"
+  description: "Admin user"
+
+kibanaserver:
+  hash: "REPLACE_WITH_BCRYPT_HASH"
+  reserved: true
+  description: "OpenSearch Dashboards user"
+
+wazuh:
+  hash: "REPLACE_WITH_BCRYPT_HASH"
+  reserved: false
+  backend_roles:
+    - "wazuh"
+  description: "Wazuh user"

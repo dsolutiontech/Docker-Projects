@@ -1,0 +1,21 @@
+################################################################
+# Wazuh Dashboard (OpenSearch Dashboards) configuration
+################################################################
+
+server.host: 0.0.0.0
+server.port: 5601
+
+opensearch.hosts: https://wazuh-indexer:9200
+opensearch.ssl.verificationMode: certificate
+
+opensearch.username: kibanaserver
+opensearch.password: ${DASHBOARD_PASSWORD}
+
+opensearch.ssl.certificateAuthorities: ["/usr/share/wazuh-dashboard/certs/root-ca.pem"]
+
+server.ssl.enabled: true
+server.ssl.key: "/usr/share/wazuh-dashboard/certs/wazuh-dashboard-key.pem"
+server.ssl.certificate: "/usr/share/wazuh-dashboard/certs/wazuh-dashboard.pem"
+
+uiSettings.overrides.defaultRoute: /app/wazuh
+logging.appenders.file.enabled: false

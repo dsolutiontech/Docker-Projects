@@ -1,0 +1,6 @@
+# Generated TLS certificates (created by setup.sh)
+config/certs/*.pem
+config/certs/*.srl
+
+# Local environment — never commit real credentials
+.env
