@@ -1,0 +1,111 @@
+networks:
+  frontend:
+    external: true
+    name: frontend
+  control:
+    driver: overlay
+    attachable: false
+
+secrets:
+  traefik_cf_api_token:
+    external: true
+  traefik_dashboard_auth:
+    external: true
+
+volumes:
+  traefik-acme: {}
+
+services:
+  # -------------------------------------------------------
+  # SOCKET PROXY
+  # -------------------------------------------------------
+  socket-proxy:
+    image: lscr.io/linuxserver/socket-proxy:3.2.10-r0-ls66
+    networks:
+      - control
+    environment:
+      - CONTAINERS=1
+      - SERVICES=1
+      - TASKS=1
+      - NETWORKS=1
+      - NODES=1
+      - INFO=1
+      - POST=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.role == manager]
+
+  # -------------------------------------------------------
+  # TRAEFIK
+  # -------------------------------------------------------
+  traefik:
+    image: traefik:v3.6.1
+    networks:
+      - frontend
+      - control
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+    environment:
+      - CF_DNS_API_TOKEN_FILE=/run/secrets/traefik_cf_api_token
+      - BASE_DOMAIN=${BASE_DOMAIN}
+    volumes:
+      - traefik-acme:/acme
+      - /opt/proxy/traefik-dynamic:/etc/traefik/dynamic:ro
+    secrets:
+      - traefik_cf_api_token
+      - traefik_dashboard_auth
+    command:
+      - --api.dashboard=true
+      - --log.level=INFO
+
+      # --- Plugin Installation ---
+      - --experimental.plugins.rewriteResponseHeaders.modulename=github.com/jamesmcroft/traefik-plugin-rewrite-response-headers
+      - --experimental.plugins.rewriteResponseHeaders.version=v1.1.2
+      - --experimental.plugins.rewriteBody.modulename=github.com/packruler/rewrite-body
+      - --experimental.plugins.rewriteBody.version=v1.2.0
+
+      # --- Dynamic Config Directory ---
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+
+      # --- Swarm Provider ---
+      - --providers.swarm=true
+      - --providers.swarm.endpoint=tcp://socket-proxy:2375
+      - --providers.swarm.network=frontend
+      - --providers.swarm.exposedByDefault=false
+
+      # --- Entrypoints ---
+      - --entryPoints.web.address=:80
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entryPoint.scheme=https
+      - --entryPoints.websecure.address=:443
+
+      # --- Certificates ---
+      - --certificatesResolvers.le-dns.acme.dnsChallenge.provider=cloudflare
+      - --certificatesResolvers.le-dns.acme.email=${LE_EMAIL}
+      - --certificatesResolvers.le-dns.acme.storage=/acme/acme.json
+
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.role == manager]
+      labels:
+        # Wrap all labels in double quotes to prevent YAML parsing errors
+        - "traefik.enable=true"
+        - "traefik.http.routers.traefik.rule=Host(`traefik.${BASE_DOMAIN}`)"
+        - "traefik.http.routers.traefik.service=api@internal"
+        - "traefik.http.routers.traefik.entrypoints=websecure"
+        - "traefik.http.routers.traefik.tls.certresolver=le-dns"
+        - "traefik.http.routers.traefik.middlewares=dash-auth"
+        - "traefik.http.middlewares.dash-auth.basicauth.usersfile=/run/secrets/traefik_dashboard_auth"
+        - "traefik.http.services.dummy-svc.loadbalancer.server.port=9999"
