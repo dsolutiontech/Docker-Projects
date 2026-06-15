@@ -20,7 +20,7 @@ services:
   # SOCKET PROXY
   # -------------------------------------------------------
   socket-proxy:
-    image: lscr.io/linuxserver/socket-proxy:3.2.10-r0-ls66
+    image: lscr.io/linuxserver/socket-proxy:3.2.19-r0-ls84
     networks:
       - control
     environment:
@@ -42,7 +42,7 @@ services:
   # TRAEFIK
   # -------------------------------------------------------
   traefik:
-    image: traefik:v3.6.1
+    image: traefik:v3.7.5
     networks:
       - frontend
       - control
@@ -89,6 +89,9 @@ services:
       - --entrypoints.web.http.redirections.entryPoint.to=websecure
       - --entrypoints.web.http.redirections.entryPoint.scheme=https
       - --entryPoints.websecure.address=:443
+      
+      # Attach the secure-headers from middlewares.yml globally to HTTPS
+      - --entrypoints.websecure.http.middlewares=secure-headers@file
 
       # --- Certificates ---
       - --certificatesResolvers.le-dns.acme.dnsChallenge.provider=cloudflare
