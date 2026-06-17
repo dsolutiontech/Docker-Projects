@@ -1,0 +1,177 @@
+networks:
+  wazuh_net:
+    driver: overlay
+  frontend:
+    external: true
+
+volumes:
+  wazuh_api_configuration:
+  wazuh_etc:
+  wazuh_logs:
+  wazuh_queue:
+  wazuh_var_multigroups:
+  wazuh_integrations:
+  wazuh_active_response:
+  wazuh_agentless:
+  wazuh_wodles:
+  filebeat_etc:
+  filebeat_var:
+  wazuh-indexer-data:
+  wazuh-dashboard-config:
+  wazuh-dashboard-custom:
+
+secrets:
+  idx_user:
+    file: .secrets/idx_user
+  idx_pass:
+    file: .secrets/idx_pass
+  api_user:
+    file: .secrets/api_user
+  api_pass:
+    file: .secrets/api_pass
+  dash_user:
+    file: .secrets/dash_user
+  dash_pass:
+    file: .secrets/dash_pass
+
+services:
+  # ---------------------------------------------------
+  # 1. WAZUH INDEXER (Database)
+  # ---------------------------------------------------
+  wazuh-indexer:
+    image: wazuh/wazuh-indexer:4.14.5
+    hostname: wazuh.indexer
+    networks:
+      - wazuh_net
+    environment:
+      - TZ=${TZ:-America/Belize}
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+    volumes:
+      - wazuh-indexer-data:/var/lib/wazuh-indexer
+      - ./config/wazuh_indexer_ssl_certs/root-ca.pem:/usr/share/wazuh-indexer/certs/root-ca.pem:ro
+      - ./config/wazuh_indexer_ssl_certs/wazuh.indexer.pem:/usr/share/wazuh-indexer/certs/wazuh.indexer.pem:ro
+      - ./config/wazuh_indexer_ssl_certs/wazuh.indexer-key.pem:/usr/share/wazuh-indexer/certs/wazuh.indexer-key.pem:ro
+      - ./config/wazuh_indexer_ssl_certs/admin.pem:/usr/share/wazuh-indexer/certs/admin.pem:ro
+      - ./config/wazuh_indexer_ssl_certs/admin-key.pem:/usr/share/wazuh-indexer/certs/admin-key.pem:ro
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.wazuh-data == true
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2G
+      restart_policy:
+        condition: any
+
+  # ---------------------------------------------------
+  # 2. WAZUH MANAGER (The Brain)
+  # ---------------------------------------------------
+  wazuh-manager:
+    image: wazuh/wazuh-manager:4.14.5
+    hostname: wazuh.manager
+    networks:
+      - wazuh_net
+    ports:
+      - target: 1514
+        published: 1514
+        protocol: tcp
+        mode: host
+      - target: 1515
+        published: 1515
+        protocol: tcp
+        mode: host
+      - target: 514
+        published: 514
+        protocol: udp
+        mode: host
+      - target: 55000
+        published: 55000
+        protocol: tcp
+        mode: host
+    environment:
+      - TZ=${TZ:-America/Belize}
+    volumes:
+      - wazuh_api_configuration:/var/ossec/api/configuration
+      - wazuh_etc:/var/ossec/etc
+      - wazuh_logs:/var/ossec/logs
+      - wazuh_queue:/var/ossec/queue
+      - wazuh_var_multigroups:/var/ossec/var/multigroups
+      - wazuh_integrations:/var/ossec/integrations
+      - wazuh_active_response:/var/ossec/active-response/bin
+      - wazuh_agentless:/var/ossec/agentless
+      - wazuh_wodles:/var/ossec/wodles
+      - filebeat_etc:/etc/filebeat
+      - filebeat_var:/var/lib/filebeat
+      - ./config/wazuh_indexer_ssl_certs/root-ca.pem:/etc/ssl/root-ca.pem:ro
+      - ./config/wazuh_indexer_ssl_certs/wazuh.manager.pem:/etc/ssl/filebeat.pem:ro
+      - ./config/wazuh_indexer_ssl_certs/wazuh.manager-key.pem:/etc/ssl/filebeat.key:ro
+      - ./scripts/wazuh-env.sh:/scripts/wazuh-env.sh:ro
+    secrets:
+      - idx_user
+      - idx_pass
+      - api_user
+      - api_pass
+    entrypoint: ["/scripts/wazuh-env.sh"]
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.wazuh-data == true
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+      restart_policy:
+        condition: any
+
+  # ---------------------------------------------------
+  # 3. WAZUH DASHBOARD (The UI)
+  # ---------------------------------------------------
+  wazuh-dashboard:
+    image: wazuh/wazuh-dashboard:4.14.5
+    hostname: wazuh.dashboard
+    networks:
+      - wazuh_net
+      - frontend
+    environment:
+      - TZ=${TZ:-America/Belize}
+      - OPENSEARCH_DASHBOARDS_URL=https://wazuh.app.dsolutiontech.net
+    volumes:
+      - ./config/wazuh_indexer_ssl_certs/wazuh.dashboard.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard.pem:ro
+      - ./config/wazuh_indexer_ssl_certs/wazuh.dashboard-key.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard-key.pem:ro
+      - ./config/wazuh_indexer_ssl_certs/root-ca.pem:/usr/share/wazuh-dashboard/certs/root-ca.pem:ro
+      - ./config/wazuh_dashboard/opensearch_dashboards.yml:/usr/share/wazuh-dashboard/config/opensearch_dashboards.yml:ro
+      - ./config/wazuh_dashboard/wazuh.yml:/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml:ro
+      - wazuh-dashboard-config:/usr/share/wazuh-dashboard/data/wazuh/config
+      - wazuh-dashboard-custom:/usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom
+      - ./scripts/wazuh-env.sh:/scripts/wazuh-env.sh:ro
+    secrets:
+      - idx_user
+      - idx_pass
+      - api_user
+      - api_pass
+      - dash_user
+      - dash_pass
+    entrypoint: ["/scripts/wazuh-env.sh"]
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.wazuh-data == true
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1.5G
+      restart_policy:
+        condition: any
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=frontend"
+        - "traefik.http.routers.wazuh.rule=Host(`wazuh.app.dsolutiontech.net`)"
+        - "traefik.http.routers.wazuh.entrypoints=websecure"
+        - "traefik.http.routers.wazuh.tls.certresolver=le-dns"
+        - "traefik.http.services.wazuh.loadbalancer.server.port=5601"
+        - "traefik.http.services.wazuh.loadbalancer.server.scheme=https"
+        - "traefik.http.services.wazuh.loadbalancer.serverstransport=ignore-cert@file"
