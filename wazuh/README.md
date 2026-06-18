@@ -18,7 +18,7 @@ docker compose -f generate-indexer-certs.yml run --rm generator
 cd /scripts
 ```
 ```
-sudo chmod +x scripts/wazuh-env.sh
+sudo chmod +x wazuh-env.sh
 ```
 4) Create Swarm Secrets (Bootstrap Authentication) Because we are using the default hashed configuration, generate the required SecretPassword secrets so the internal services (Filebeat & OpenSearch) can communicate successfully. (Note: We will change this password through the Wazuh UI later).
 ```
