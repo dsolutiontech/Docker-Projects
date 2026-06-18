@@ -28,7 +28,7 @@ mkdir -p .secrets
 echo "admin" > .secrets/idx_user
 ```
 ```
-echo "admin" > .secrets/idx_pass
+echo "SecretPassword" > .secrets/idx_pass
 ```
 ```
 echo "wazuh-wui" > .secrets/api_user
